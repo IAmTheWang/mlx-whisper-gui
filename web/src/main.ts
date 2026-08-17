@@ -1,0 +1,72 @@
+import './style.css'
+import { createJob, listModels } from './api'
+import { el } from './dom'
+import { renderBrowser } from './views/browser'
+import { renderJobForm, type JobFormController } from './views/jobForm'
+import { renderJobList } from './views/jobList'
+import { renderJobDetail, type JobDetailController } from './views/jobDetail'
+
+async function main() {
+  const app = document.querySelector<HTMLDivElement>('#app')
+  if (!app) throw new Error('#app root not found')
+  app.replaceChildren()
+
+  const browserPane = el('div', { class: 'pane-browser' })
+  const formPane = el('div', { class: 'pane-form' })
+  const listPane = el('div', { class: 'pane-list' })
+  const detailPane = el('div', { class: 'pane-detail' })
+
+  app.append(
+    el('div', { class: 'app-layout' }, [
+      el('div', { class: 'col-left' }, [browserPane, formPane]),
+      el('div', { class: 'col-right' }, [listPane, detailPane]),
+    ]),
+  )
+
+  let selectedPaths: string[] = []
+  let form: JobFormController | undefined
+  let detailController: JobDetailController | undefined
+
+  const jobList = renderJobList(listPane, {
+    onSelect: (id) => openJobDetail(id),
+  })
+
+  function openJobDetail(id: string) {
+    detailController?.destroy()
+    detailController = renderJobDetail(detailPane, id, () => {
+      void jobList.refresh()
+    })
+  }
+
+  const browser = renderBrowser(browserPane, {
+    onSelectionChange: (paths) => {
+      selectedPaths = paths
+      form?.setSelectionCount(paths.length)
+    },
+  })
+
+  const { models, languages } = await listModels()
+  form = renderJobForm(formPane, models, languages, {
+    onStart: async (model, language) => {
+      const paths = [...selectedPaths]
+      let lastJobId: string | undefined
+      for (const videoPath of paths) {
+        try {
+          const job = await createJob({ videoPath, model, language })
+          lastJobId = job.id
+        } catch (err) {
+          alert(`Failed to create job (${videoPath}): ${(err as Error).message}`)
+        }
+      }
+      browser.clearSelection()
+      form?.setSelectionCount(0)
+      await jobList.refresh()
+      if (lastJobId) openJobDetail(lastJobId)
+    },
+  })
+}
+
+main().catch((err) => {
+  console.error(err)
+  document.body.append(el('pre', { class: 'fatal-error' }, [String(err)]))
+})

@@ -1,0 +1,272 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  color: #1a1a1a;
+  background: #f5f5f7;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.col-left,
+.col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pane-browser,
+.pane-form,
+.pane-list,
+.pane-detail {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+/* browser */
+.bookmarks {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.bookmark-btn,
+.up-btn {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.bookmark-btn:hover,
+.up-btn:hover {
+  background: #e0e0e0;
+}
+.breadcrumb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.breadcrumb {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: #555;
+  overflow-wrap: anywhere;
+}
+.entry-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border-top: 1px solid #eee;
+}
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+.entry-dir {
+  cursor: pointer;
+}
+.entry-dir:hover,
+.entry-file:hover {
+  background: #f5f5f7;
+}
+.entry-file {
+  cursor: pointer;
+}
+.entry-file input[type='checkbox']:disabled {
+  cursor: default;
+}
+.entry-video .entry-name {
+  font-weight: 600;
+}
+.entry-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-status,
+.browser-error,
+.job-list-error,
+.job-list-empty {
+  color: #888;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.browser-error,
+.job-list-error {
+  color: #c0392b;
+}
+
+/* job form */
+.job-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.job-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.selection-count {
+  font-size: 13px;
+  color: #555;
+}
+.start-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.start-btn:disabled {
+  background: #b0b8c4;
+  cursor: not-allowed;
+}
+
+/* job list */
+.job-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 4px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.job-row:hover {
+  background: #f5f5f7;
+}
+.job-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+.job-row-state {
+  flex-shrink: 0;
+  color: #555;
+}
+.job-row-failed .job-row-state {
+  color: #c0392b;
+}
+.job-row-done .job-row-state {
+  color: #2e7d32;
+}
+
+/* job detail */
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.detail-state {
+  font-weight: 600;
+  font-size: 13px;
+}
+.detail-state-failed {
+  color: #c0392b;
+}
+.detail-state-done {
+  color: #2e7d32;
+}
+.cancel-btn {
+  background: #fff;
+  border: 1px solid #c0392b;
+  color: #c0392b;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.download-link {
+  background: #2e7d32;
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.sidecar-note {
+  font-size: 12px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.sidecar-ok {
+  color: #2e7d32;
+}
+.sidecar-error {
+  color: #c0392b;
+}
+.detail-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #2563eb;
+  transition: width 0.2s ease;
+}
+.progress-text {
+  font-size: 12px;
+  color: #555;
+  min-width: 3em;
+  text-align: right;
+}
+.log-pane {
+  height: 360px;
+  overflow-y: auto;
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 8px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+}
+.log-line {
+  color: #c9d1d9;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.log-stderr {
+  color: #e0a94f;
+}
+.log-system {
+  color: #f47171;
+  font-weight: 600;
+}
+
+.fatal-error {
+  color: #c0392b;
+  padding: 16px;
+  white-space: pre-wrap;
+}
