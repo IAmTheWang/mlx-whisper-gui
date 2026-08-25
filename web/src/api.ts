@@ -55,3 +55,10 @@ export function cancelJob(id: string): Promise<Job> {
 export function srtDownloadUrl(id: string): string {
   return `/api/jobs/${encodeURIComponent(id)}/srt`
 }
+
+export function moveSrt(id: string, destDir?: string): Promise<{ path: string }> {
+  return request(`/api/jobs/${encodeURIComponent(id)}/move-srt`, {
+    method: 'POST',
+    body: JSON.stringify({ destDir: destDir ?? '' }),
+  })
+}

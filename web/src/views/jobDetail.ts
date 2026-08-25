@@ -1,6 +1,7 @@
 import type { Job, LogEvent, ProgressEvent, StateEvent } from '../types'
-import { cancelJob, getJob, srtDownloadUrl } from '../api'
+import { cancelJob, getJob, moveSrt, srtDownloadUrl } from '../api'
 import { openJobStream } from '../sse'
+import { openFolderPicker } from './folderPicker'
 import { el } from '../dom'
 
 export interface JobDetailController {
@@ -25,13 +26,20 @@ export function renderJobDetail(container: HTMLElement, jobId: string, onTermina
   const cancelBtn = el('button', { class: 'cancel-btn' }, ['Cancel'])
   const downloadLink = el('a', { class: 'download-link' }, ['Download .srt'])
   downloadLink.style.display = 'none'
+  const moveVideoBtn = el('button', { class: 'move-btn' }, ['Save to Video Folder'])
+  moveVideoBtn.style.display = 'none'
+  const moveFolderBtn = el('button', { class: 'move-btn' }, ['Save to Folder…'])
+  moveFolderBtn.style.display = 'none'
   const sidecarNote = el('div', { class: 'sidecar-note' })
   sidecarNote.style.display = 'none'
+  const moveNote = el('div', { class: 'move-note' })
+  moveNote.style.display = 'none'
   const logPane = el('div', { class: 'log-pane' })
 
   const root = el('div', { class: 'job-detail' }, [
-    el('div', { class: 'detail-header' }, [stateLabel, cancelBtn, downloadLink]),
+    el('div', { class: 'detail-header' }, [stateLabel, cancelBtn, downloadLink, moveVideoBtn, moveFolderBtn]),
     sidecarNote,
+    moveNote,
     el('div', { class: 'detail-progress' }, [progressBar, progressText]),
     logPane,
   ])
@@ -45,6 +53,29 @@ export function renderJobDetail(container: HTMLElement, jobId: string, onTermina
       appendLogLine('system', `Cancel failed: ${(err as Error).message}`)
       cancelBtn.disabled = false
     }
+  })
+
+  function showMoveNote(text: string, isError: boolean) {
+    moveNote.textContent = text
+    moveNote.className = `move-note ${isError ? 'move-note-error' : 'move-note-ok'}`
+    moveNote.style.display = ''
+  }
+
+  async function doMove(destDir: string | undefined, trigger: HTMLButtonElement) {
+    trigger.disabled = true
+    try {
+      const res = await moveSrt(jobId, destDir)
+      showMoveNote(`Saved to: ${res.path}`, false)
+    } catch (err) {
+      showMoveNote(`Save failed: ${(err as Error).message}`, true)
+    } finally {
+      trigger.disabled = false
+    }
+  }
+
+  moveVideoBtn.addEventListener('click', () => doMove(undefined, moveVideoBtn))
+  moveFolderBtn.addEventListener('click', () => {
+    openFolderPicker((destDir) => doMove(destDir, moveFolderBtn))
   })
 
   function appendLogLine(stream: string, text: string) {
@@ -67,6 +98,8 @@ export function renderJobDetail(container: HTMLElement, jobId: string, onTermina
     if (opts.srtAvailable) {
       downloadLink.setAttribute('href', srtDownloadUrl(jobId))
       downloadLink.style.display = ''
+      moveVideoBtn.style.display = ''
+      moveFolderBtn.style.display = ''
     }
     if (opts.sidecarPath) {
       sidecarNote.textContent = `Saved next to video: ${opts.sidecarPath}`

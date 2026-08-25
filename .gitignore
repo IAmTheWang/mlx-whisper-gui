@@ -3,3 +3,5 @@
 /internal/server/dist/
 *.log
 /srt/
+
+.DS_Store

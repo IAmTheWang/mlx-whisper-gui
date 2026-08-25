@@ -25,7 +25,7 @@ type ModelsResponse struct {
 
 var curatedModels = []struct{ ID, Label string }{
 	{"mlx-community/whisper-large-v3-turbo", "Large v3 Turbo (fast)"},
-	{"mlx-community/whisper-large-v3", "Large v3 (most accurate, slow)"},
+	{"mlx-community/whisper-large-v3-mlx", "Large v3 (most accurate, slow)"},
 	{"mlx-community/whisper-medium", "Medium (balanced)"},
 }
 

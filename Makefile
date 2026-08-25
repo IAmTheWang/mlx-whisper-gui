@@ -1,4 +1,10 @@
-.PHONY: dev-web dev-api build run clean test
+.PHONY: dev dev-web dev-api build run clean test
+
+dev:
+	@trap 'kill 0' EXIT; \
+	$(MAKE) dev-api & \
+	$(MAKE) dev-web & \
+	wait
 
 dev-web:
 	cd web && npm install && npm run dev

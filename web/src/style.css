@@ -207,15 +207,84 @@ body {
   font-size: 12px;
   text-decoration: none;
 }
-.sidecar-note {
+.move-btn {
+  background: #fff;
+  border: 1px solid #2563eb;
+  color: #2563eb;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.move-btn:disabled {
+  border-color: #b0b8c4;
+  color: #b0b8c4;
+  cursor: not-allowed;
+}
+.sidecar-note,
+.move-note {
   font-size: 12px;
   margin-bottom: 8px;
   overflow-wrap: anywhere;
 }
-.sidecar-ok {
+.sidecar-ok,
+.move-note-ok {
   color: #2e7d32;
 }
-.sidecar-error {
+.sidecar-error,
+.move-note-error {
+  color: #c0392b;
+}
+
+/* folder picker modal */
+.folder-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.folder-picker-panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.folder-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.folder-picker-cancel {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.folder-picker-select {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.folder-picker-status,
+.folder-picker-error {
+  color: #888;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.folder-picker-error {
   color: #c0392b;
 }
 .detail-progress {

@@ -14,6 +14,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/jobs/{id}/cancel", s.handleCancelJob)
 	s.mux.HandleFunc("GET /api/jobs/{id}/events", s.handleJobEvents)
 	s.mux.HandleFunc("GET /api/jobs/{id}/srt", s.handleDownloadSRT)
+	s.mux.HandleFunc("POST /api/jobs/{id}/move-srt", s.handleMoveSRT)
 
 	// Subtree pattern "/api/" is more specific than "/" for anything under
 	// /api/, so any API path not matched by one of the routes above lands

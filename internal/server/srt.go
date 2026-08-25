@@ -28,8 +28,14 @@ func (s *Server) handleDownloadSRT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	base := filepath.Base(snap.VideoPath)
-	filename := strings.TrimSuffix(base, filepath.Ext(base)) + ".srt"
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", srtFilenameFor(snap.VideoPath)))
 	http.ServeFile(w, r, snap.SRTPath)
+}
+
+// srtFilenameFor derives the human-readable .srt filename from the source
+// video's basename (not the job ID), shared by the download and move-srt
+// handlers so both name the file the same way.
+func srtFilenameFor(videoPath string) string {
+	base := filepath.Base(videoPath)
+	return strings.TrimSuffix(base, filepath.Ext(base)) + ".srt"
 }
