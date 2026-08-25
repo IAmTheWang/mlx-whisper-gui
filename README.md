@@ -1,58 +1,137 @@
 # whisper-gui
 
-本地 macOS 专用的网页 GUI，封装 `mlx_whisper`，用于批量把视频转写成 `.srt` 字幕。Go 后端 + vanilla TS/Vite 前端（无框架），驱动 `mlx_whisper`/`ffmpeg` 子进程完成转写。
+[English](#english) | [中文](#中文)
 
-## 前置依赖
+A local, **macOS-only** web GUI wrapping [`mlx_whisper`](https://github.com/ml-explore/mlx-examples/tree/main/whisper) for batch video transcription to `.srt` subtitle files. A Go backend serves a small vanilla TypeScript/Vite frontend (no framework) and drives `mlx_whisper`/`ffmpeg` as subprocesses.
 
-- **mlx_whisper**（pip 安装，需要 Apple Silicon）
-- **ffmpeg**（`brew install ffmpeg`）
+---
 
-两者由 `internal/whisperbin` 在运行时自动探测路径（config 覆盖 → `PATH` → 已知 pip 安装位置）；探测失败时可在 UI 的 Settings 里手动指定路径。
+## English
 
-## 运行
+### Why macOS-only
 
-开发模式（前后端分开跑，两个终端，前端支持热重载）：
+`mlx_whisper` is built on Apple's [MLX](https://github.com/ml-explore/mlx) framework, which targets Apple Silicon's unified-memory architecture. It does not run on Intel Macs, Windows, or Linux. The app's config/job-history storage path (`~/Library/Application Support/whisper-gui/`) is also macOS-specific.
+
+### Features
+
+- Server-side file browser to pick one or more video files (checkbox multi-select, video files only).
+- Pick a Whisper model and language, then queue transcription jobs.
+- Jobs run **one at a time** — MLX's unified-memory GPU path gains nothing from parallel jobs on a single Mac, so a single-worker FIFO queue avoids GPU memory contention.
+- Live job progress and logs via Server-Sent Events (auto-reconnect, log replay after a server restart).
+- Cancel a running or queued job.
+- Download the resulting `.srt`; a copy is also saved next to the source video (best-effort).
+- Settings page to override the `mlx_whisper`/`ffmpeg` binary paths if auto-detection fails.
+
+### Requirements
+
+- macOS on Apple Silicon (M1/M2/M3/M4).
+- [`mlx_whisper`](https://pypi.org/project/mlx-whisper/) installed via pip.
+- [`ffmpeg`](https://ffmpeg.org/) installed, e.g. via Homebrew (`brew install ffmpeg`).
+- Go 1.26+ and Node.js (for building from source).
+
+Both binaries are auto-detected on `PATH` (with a pip user-install fallback for `mlx_whisper`); if detection fails, set explicit paths in the app's Settings page.
+
+### Build & run
 
 ```bash
-make dev-api   # 后端，监听 :8787
-make dev-web   # 前端 Vite dev server，代理 /api 到 :8787
+make build   # builds the frontend into internal/server/dist, then builds the Go binary
+make run     # build + run ./bin/whisper-gui
 ```
 
-或者一条命令同时启动（同一终端交织输出，Ctrl+C 一起退出）：
+Other targets:
 
 ```bash
-make dev
+make dev-api   # go run ./cmd/whisper-gui — starts the API server on :8787
+make dev-web   # cd web && npm run dev — Vite dev server, proxies /api to :8787
+make test      # go test ./...
+make clean     # remove build artifacts (bin/, web/node_modules, web/dist, internal/server/dist)
 ```
 
-生产/单进程模式（前端会先重新构建，再编译打包进 Go 二进制）：
+For frontend-only development, run `make dev-api` and `make dev-web` side by side, then open the Vite dev server URL.
+
+Once built, `whisper-gui` serves everything (API + embedded frontend) on a single port:
 
 ```bash
-make run
+./bin/whisper-gui -port 8787
 ```
 
-访问 `http://localhost:8787`（`make dev-web` 模式下访问 Vite 给出的地址，通常是 `http://localhost:5173`）。
+### Data storage
 
-其他：
+All job history, subprocess logs, and generated `.srt` files live under `~/Library/Application Support/whisper-gui/` (`config.json`, `jobs.json`, `jobs/<id>/`) — nothing is written into the repo. The `srt/` folder in this repo, if present locally, is just a manually-curated copy pulled from there and is gitignored.
+
+### Project structure
+
+- `cmd/whisper-gui` — binary entrypoint; flag parsing, startup wiring, graceful shutdown.
+- `internal/jobmanager` — job state machine, single-worker FIFO transcription queue, subprocess execution, SSE event fan-out.
+- `internal/server` — HTTP handlers (standard library `net/http`), embeds the built frontend via `go:embed`.
+- `internal/config` — JSON config file for user-overridden binary paths.
+- `internal/whisperbin` — resolves `mlx_whisper`/`ffmpeg` binary paths.
+- `web/` — vanilla TypeScript + Vite frontend, built straight into `internal/server/dist`.
+
+See the `CLAUDE.md` file in each directory for implementation details.
+
+---
+
+## 中文
+
+### 为什么只支持 macOS
+
+`mlx_whisper` 基于苹果的 [MLX](https://github.com/ml-explore/mlx) 框架构建，该框架针对 Apple Silicon 的统一内存架构设计，无法在 Intel Mac、Windows 或 Linux 上运行。此外，本应用的配置和任务历史存储路径（`~/Library/Application Support/whisper-gui/`）也是 macOS 专属路径。
+
+### 功能特性
+
+- 服务端文件浏览器，可勾选一个或多个视频文件（多选，仅视频文件可选）。
+- 选择 Whisper 模型和语言，将转写任务加入队列。
+- 任务**串行执行**——MLX 的统一内存 GPU 架构在单台 Mac 上并行跑多个任务并不能带来收益，单 worker 的 FIFO 队列可以避免 GPU 内存争用。
+- 通过 Server-Sent Events 实时展示任务进度与日志（自动重连，服务重启后可回放历史日志）。
+- 支持取消排队中或正在运行的任务。
+- 转写完成后可下载 `.srt` 文件，同时会尽力在源视频旁保存一份副本。
+- 设置页面可在自动检测失败时手动指定 `mlx_whisper`/`ffmpeg` 的可执行文件路径。
+
+### 环境要求
+
+- 搭载 Apple Silicon（M1/M2/M3/M4）芯片的 macOS。
+- 通过 pip 安装的 [`mlx_whisper`](https://pypi.org/project/mlx-whisper/)。
+- 已安装 [`ffmpeg`](https://ffmpeg.org/)，例如通过 Homebrew 安装（`brew install ffmpeg`）。
+- 若需从源码构建：Go 1.26+ 和 Node.js。
+
+两个可执行文件默认会从 `PATH` 中自动检测（`mlx_whisper` 还有 pip 用户安装路径作为兜底）；如果自动检测失败，可在应用的设置页面手动指定路径。
+
+### 构建与运行
 
 ```bash
-make build   # 只构建，不运行
-make test    # go test ./...
+make build   # 先将前端构建到 internal/server/dist，再构建 Go 二进制
+make run     # 构建并运行 ./bin/whisper-gui
 ```
 
-## 支持的模型
+其他常用命令：
 
-| 模型 | 参数量 | 速度 | 准确率 | 说明 |
-|---|---|---|---|---|
-| medium | ~769M | 较慢 | 较准 | 速度与准确率的折中，清晰单人语音场景够用 |
-| large-v3-turbo | ~809M | 快 | 接近 large-v3 | large-v3 的剪枝加速版，日常首选 |
-| large-v3 | ~1.5B | 最慢 | 最准 | 背景噪音多/口音重/多人交叉场景更值得用 |
+```bash
+make dev-api   # go run ./cmd/whisper-gui —— 在 :8787 启动 API 服务
+make dev-web   # cd web && npm run dev —— 启动 Vite 开发服务器，将 /api 代理到 :8787
+make test      # go test ./...
+make clean     # 清理构建产物（bin/、web/node_modules、web/dist、internal/server/dist）
+```
 
-模型需要提前通过 `mlx_whisper`（HuggingFace Hub）下载好；App 会读取本地 HuggingFace 缓存（`~/.cache/huggingface/hub/`）判断模型是否已就绪，未下载的模型会在 UI 里标注「needs download」。
+如果只想开发前端，可以同时运行 `make dev-api` 和 `make dev-web`，然后打开 Vite 开发服务器给出的地址。
 
-## 运行时状态（不在 git 里）
+构建完成后，`whisper-gui` 会用同一个端口同时提供 API 和前端页面：
 
-任务历史、子进程输出日志、生成的 `.srt` 都保存在 `~/Library/Application Support/whisper-gui/`（`config.json`、`jobs.json`、`jobs/<id>/`），不进仓库。仓库里的 `srt/` 目录只是从那里手动挑出来的字幕副本，与 App 本身无关。
+```bash
+./bin/whisper-gui -port 8787
+```
 
-## 更多细节
+### 数据存储
 
-架构、目录职责、开发约定见 [CLAUDE.md](CLAUDE.md)，每个子目录下也各自有一份 `CLAUDE.md`。
+所有任务历史、子进程日志和生成的 `.srt` 文件都保存在 `~/Library/Application Support/whisper-gui/`（`config.json`、`jobs.json`、`jobs/<id>/`）——不会写入仓库目录。仓库中的 `srt/` 目录（如果本地存在）只是从该目录手动拉取的副本，已被 gitignore 忽略。
+
+### 项目结构
+
+- `cmd/whisper-gui` —— 二进制入口：命令行参数解析、启动装配、优雅关闭。
+- `internal/jobmanager` —— 任务状态机、单 worker 的 FIFO 转写队列、子进程执行、SSE 事件分发。
+- `internal/server` —— HTTP 处理层（标准库 `net/http`），通过 `go:embed` 内嵌构建好的前端。
+- `internal/config` —— JSON 配置文件，保存用户自定义的可执行文件路径。
+- `internal/whisperbin` —— 负责解析 `mlx_whisper`/`ffmpeg` 的可执行文件路径。
+- `web/` —— 原生 TypeScript + Vite 前端，直接构建到 `internal/server/dist`。
+
+更多实现细节参见各目录下的 `CLAUDE.md` 文件。
