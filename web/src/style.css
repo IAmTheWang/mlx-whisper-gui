@@ -67,6 +67,29 @@ body {
   color: #555;
   overflow-wrap: anywhere;
 }
+.sort-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.sort-btn {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.sort-btn:hover {
+  background: #e0e0e0;
+}
+.sort-btn-active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
 .entry-list {
   max-height: 320px;
   overflow-y: auto;
@@ -145,6 +168,10 @@ body {
 }
 
 /* job list */
+.job-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
 .job-row {
   display: flex;
   justify-content: space-between;

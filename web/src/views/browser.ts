@@ -1,8 +1,15 @@
 import type { Bookmark, BrowseEntry, BrowseResponse } from '../types'
 import { browseDir } from '../api'
 import { el, clear } from '../dom'
+import { parseSortState, renderSortRow, sortEntries, type SortState } from '../sortControls'
 
 const LAST_PATH_KEY = 'whisper-gui:lastPath'
+const SORT_KEY = 'whisper-gui:browserSort'
+const SORT_OPTIONS: { key: SortState['key']; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'date', label: 'Date' },
+  { key: 'type', label: 'Type' },
+]
 
 export interface BrowserHandlers {
   onSelectionChange: (paths: string[]) => void
@@ -10,11 +17,18 @@ export interface BrowserHandlers {
 
 export interface BrowserController {
   clearSelection(): void
+  getEntry(path: string): BrowseEntry | undefined
 }
 
 export function renderBrowser(container: HTMLElement, handlers: BrowserHandlers): BrowserController {
   const selected = new Set<string>()
+  // Entries seen across every directory visited this session, keyed by path
+  // -- selections can span multiple directories, but `lastData` only holds
+  // the currently displayed one, so this is the only place still holding
+  // metadata (like hasSrt) for a selected file after the user navigates away.
+  const knownEntries = new Map<string, BrowseEntry>()
   let lastData: BrowseResponse | undefined
+  let sortState: SortState = parseSortState(localStorage.getItem(SORT_KEY), ['name', 'date', 'type'])
 
   const root = el('div', { class: 'browser' })
   container.append(root)
@@ -34,6 +48,7 @@ export function renderBrowser(container: HTMLElement, handlers: BrowserHandlers)
   function renderLoaded() {
     if (!lastData) return
     const { path, parent, entries, bookmarks } = lastData
+    for (const entry of entries) knownEntries.set(entry.path, entry)
     clear(root)
 
     root.append(
@@ -53,8 +68,16 @@ export function renderBrowser(container: HTMLElement, handlers: BrowserHandlers)
       ]),
     )
 
+    root.append(
+      renderSortRow(SORT_OPTIONS, sortState, (next) => {
+        sortState = next
+        localStorage.setItem(SORT_KEY, `${next.key}:${next.dir}`)
+        renderLoaded()
+      }),
+    )
+
     const list = el('div', { class: 'entry-list' })
-    for (const entry of entries) {
+    for (const entry of sortEntries(entries, sortState)) {
       list.append(renderEntry(entry))
     }
     root.append(list)
@@ -94,6 +117,9 @@ export function renderBrowser(container: HTMLElement, handlers: BrowserHandlers)
       selected.clear()
       handlers.onSelectionChange([])
       renderLoaded()
+    },
+    getEntry(path) {
+      return knownEntries.get(path)
     },
   }
 }

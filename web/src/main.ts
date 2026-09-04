@@ -49,6 +49,18 @@ async function main() {
   form = renderJobForm(formPane, models, languages, {
     onStart: async (model, language) => {
       const paths = [...selectedPaths]
+
+      const overwriteNames = paths
+        .map((p) => browser.getEntry(p))
+        .filter((e): e is NonNullable<typeof e> => !!e?.hasSrt)
+        .map((e) => e.name)
+      if (overwriteNames.length > 0) {
+        const proceed = confirm(
+          `These files already have a subtitle, which will be overwritten:\n\n${overwriteNames.join('\n')}\n\nContinue?`,
+        )
+        if (!proceed) return
+      }
+
       let lastJobId: string | undefined
       for (const videoPath of paths) {
         try {

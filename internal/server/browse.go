@@ -17,6 +17,7 @@ type BrowseEntry struct {
 	ModTime time.Time `json:"modTime"`
 	Ext     string    `json:"ext"`
 	IsVideo bool      `json:"isVideo"`
+	HasSrt  bool      `json:"hasSrt"`
 }
 
 type Bookmark struct {
@@ -99,6 +100,21 @@ func handleBrowse(w http.ResponseWriter, r *http.Request) {
 			IsVideo: videoExts[ext],
 		})
 	}
+	// Keyed by lowercased name: APFS is case-insensitive by default, so
+	// Video.MP4's sidecar could be named video.srt and still be the same
+	// file on disk.
+	srtNames := make(map[string]bool)
+	for _, e := range out {
+		if !e.IsDir && e.Ext == ".srt" {
+			srtNames[strings.ToLower(e.Name)] = true
+		}
+	}
+	for i := range out {
+		if out[i].IsVideo {
+			out[i].HasSrt = srtNames[strings.ToLower(srtFilenameFor(out[i].Name))]
+		}
+	}
+
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].IsDir != out[j].IsDir {
 			return out[i].IsDir

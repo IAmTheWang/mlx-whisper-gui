@@ -263,6 +263,13 @@ func (m *Manager) runJob(job *Job) {
 		"--output-dir", job.OutputDir,
 		"--output-name", job.ID,
 		"--output-format", "srt",
+		// mlx_whisper defaults to True, which feeds each window's output back in
+		// as the next window's prompt -- great for consistency, but once a
+		// window mistranscribes (e.g. into silence or hold audio) the model
+		// conditions on its own bad output and gets stuck repeating it verbatim
+		// for the rest of the file. False trades a bit of cross-window
+		// consistency for immunity to that failure loop.
+		"--condition-on-previous-text", "False",
 	}
 	if job.Language != "" && job.Language != "auto" {
 		args = append(args, "--language", job.Language)

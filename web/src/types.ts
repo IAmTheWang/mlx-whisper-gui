@@ -24,6 +24,7 @@ export interface BrowseEntry {
   modTime: string
   ext: string
   isVideo: boolean
+  hasSrt: boolean
 }
 
 export interface Bookmark {

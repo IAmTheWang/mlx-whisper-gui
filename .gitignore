@@ -1,4 +1,5 @@
 /bin/
+/tmp/
 /web/node_modules/
 /internal/server/dist/
 *.log

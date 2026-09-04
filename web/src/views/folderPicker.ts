@@ -1,8 +1,14 @@
 import type { Bookmark, BrowseEntry, BrowseResponse } from '../types'
 import { browseDir } from '../api'
 import { el, clear } from '../dom'
+import { parseSortState, renderSortRow, sortEntries, type SortState } from '../sortControls'
 
 const LAST_DEST_KEY = 'whisper-gui:lastSrtDestDir'
+const SORT_KEY = 'whisper-gui:folderPickerSort'
+const SORT_OPTIONS: { key: SortState['key']; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'date', label: 'Date' },
+]
 
 // A directory-only variant of browser.ts's file browser, shown as a modal
 // overlay so it can be opened on demand from job detail without taking over
@@ -17,6 +23,8 @@ export function openFolderPicker(onSelect: (path: string) => void): void {
     if (e.target === overlay) close()
   } }, [panel])
   document.body.append(overlay)
+
+  let sortState: SortState = parseSortState(localStorage.getItem(SORT_KEY), ['name', 'date'])
 
   function close() {
     overlay.remove()
@@ -58,8 +66,16 @@ export function openFolderPicker(onSelect: (path: string) => void): void {
       ]),
     )
 
+    panel.append(
+      renderSortRow(SORT_OPTIONS, sortState, (next) => {
+        sortState = next
+        localStorage.setItem(SORT_KEY, `${next.key}:${next.dir}`)
+        renderLoaded(data)
+      }),
+    )
+
     const list = el('div', { class: 'entry-list' })
-    for (const entry of entries.filter((e: BrowseEntry) => e.isDir)) {
+    for (const entry of sortEntries(entries.filter((e: BrowseEntry) => e.isDir), sortState)) {
       list.append(
         el('div', { class: 'entry entry-dir', onclick: () => load(entry.path) }, [
           el('span', { class: 'entry-icon' }, ['📁']),

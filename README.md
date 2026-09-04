@@ -27,7 +27,7 @@ A local, **macOS-only** web GUI wrapping [`mlx_whisper`](https://github.com/ml-e
 - macOS on Apple Silicon (M1/M2/M3/M4).
 - [`mlx_whisper`](https://pypi.org/project/mlx-whisper/) installed via pip.
 - [`ffmpeg`](https://ffmpeg.org/) installed, e.g. via Homebrew (`brew install ffmpeg`).
-- Go 1.26+ and Node.js (for building from source).
+- Go 1.26+ and [Bun](https://bun.sh) (for building from source).
 
 Both binaries are auto-detected on `PATH` (with a pip user-install fallback for `mlx_whisper`); if detection fails, set explicit paths in the app's Settings page.
 
@@ -42,12 +42,23 @@ Other targets:
 
 ```bash
 make dev-api   # go run ./cmd/whisper-gui — starts the API server on :8787
-make dev-web   # cd web && npm run dev — Vite dev server, proxies /api to :8787
+make dev-web   # cd web && bun run dev — Vite dev server, proxies /api to :8787
 make test      # go test ./...
-make clean     # remove build artifacts (bin/, web/node_modules, web/dist, internal/server/dist)
+make clean     # remove build artifacts (bin/, web/node_modules, web/dist, internal/server/dist, tmp)
 ```
 
 For frontend-only development, run `make dev-api` and `make dev-web` side by side, then open the Vite dev server URL.
+
+For backend auto-reload (rebuild + restart on every saved `.go` file), use [`air`](https://github.com/air-verse/air):
+
+```bash
+go install github.com/air-verse/air@latest   # one-time install
+
+make dev-api-watch   # like dev-api, but auto-rebuilds/restarts on .go save
+make dev-watch        # dev-api-watch + dev-web together
+```
+
+> `dev-api-watch` restarts the server on every saved `.go` file — don't use it while a transcription job you care about is running, it will be killed just like a manual Ctrl+C would.
 
 Once built, `whisper-gui` serves everything (API + embedded frontend) on a single port:
 
@@ -93,7 +104,7 @@ See the `CLAUDE.md` file in each directory for implementation details.
 - 搭载 Apple Silicon（M1/M2/M3/M4）芯片的 macOS。
 - 通过 pip 安装的 [`mlx_whisper`](https://pypi.org/project/mlx-whisper/)。
 - 已安装 [`ffmpeg`](https://ffmpeg.org/)，例如通过 Homebrew 安装（`brew install ffmpeg`）。
-- 若需从源码构建：Go 1.26+ 和 Node.js。
+- 若需从源码构建：Go 1.26+ 和 [Bun](https://bun.sh)。
 
 两个可执行文件默认会从 `PATH` 中自动检测（`mlx_whisper` 还有 pip 用户安装路径作为兜底）；如果自动检测失败，可在应用的设置页面手动指定路径。
 
@@ -108,12 +119,23 @@ make run     # 构建并运行 ./bin/whisper-gui
 
 ```bash
 make dev-api   # go run ./cmd/whisper-gui —— 在 :8787 启动 API 服务
-make dev-web   # cd web && npm run dev —— 启动 Vite 开发服务器，将 /api 代理到 :8787
+make dev-web   # cd web && bun run dev —— 启动 Vite 开发服务器，将 /api 代理到 :8787
 make test      # go test ./...
-make clean     # 清理构建产物（bin/、web/node_modules、web/dist、internal/server/dist）
+make clean     # 清理构建产物（bin/、web/node_modules、web/dist、internal/server/dist、tmp）
 ```
 
 如果只想开发前端，可以同时运行 `make dev-api` 和 `make dev-web`，然后打开 Vite 开发服务器给出的地址。
+
+如果想要后端热更新（保存 `.go` 文件后自动重新编译并重启），可以用 [`air`](https://github.com/air-verse/air)：
+
+```bash
+go install github.com/air-verse/air@latest   # 一次性安装
+
+make dev-api-watch   # 类似 dev-api，但保存 .go 文件后会自动重新编译并重启
+make dev-watch        # dev-api-watch + dev-web 一起启动
+```
+
+> `dev-api-watch` 会在每次保存 `.go` 文件时重启服务——如果这时候有你在意的转写任务正在跑，不要用它，效果和手动 Ctrl+C 一样会把任务杀掉。
 
 构建完成后，`whisper-gui` 会用同一个端口同时提供 API 和前端页面：
 

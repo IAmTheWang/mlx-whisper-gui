@@ -48,8 +48,8 @@ var distFS embed.FS
 
 ```
 make dev-api  →  go run ./cmd/whisper-gui         （后端，热重跑，不留二进制）
-make dev-web  →  cd web && npm run dev             （前端 Vite dev server，代理 /api）
+make dev-web  →  cd web && bun run dev             （前端 Vite dev server，代理 /api）
 make dev      →  上面两个一起跑（trap 'kill 0' EXIT 保证 Ctrl+C 一起退出）
-make build    →  npm run build + go build -o bin/whisper-gui  （前端先打包，再嵌入 Go 二进制）
+make build    →  bun run build + go build -o bin/whisper-gui  （前端先打包，再嵌入 Go 二进制；web/ 用 Bun 不用 npm）
 make run      →  依赖 build，然后执行 ./bin/whisper-gui        （单进程验证最终打包效果）
 ```

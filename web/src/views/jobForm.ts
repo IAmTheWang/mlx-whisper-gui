@@ -20,6 +20,8 @@ export function renderJobForm(
     {},
     models.map((m) => el('option', { value: m.id }, [`${m.label}${m.cached ? '' : ' (needs download)'}`])),
   )
+  const defaultModelIndex = models.findIndex((m) => m.id === 'mlx-community/whisper-large-v3-mlx')
+  if (defaultModelIndex >= 0) modelSelect.selectedIndex = defaultModelIndex
 
   const languageSelect = el(
     'select',

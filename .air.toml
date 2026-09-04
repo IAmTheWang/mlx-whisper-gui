@@ -1,0 +1,36 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/whisper-gui-air ./cmd/whisper-gui"
+  entrypoint = ["./tmp/whisper-gui-air"]
+  include_ext = ["go"]
+  exclude_dir = [
+    "web",
+    "bin",
+    "srt",
+    "notes",
+    "tmp",
+    ".git",
+    ".serena",
+    "internal/server/dist",
+  ]
+  exclude_regex = ["_test\\.go"]
+  exclude_unchanged = true
+  delay = 1000
+  send_interrupt = true
+  kill_delay = "10s"
+  stop_on_error = true
+  log = "build-errors.log"
+
+[log]
+  time = true
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true
