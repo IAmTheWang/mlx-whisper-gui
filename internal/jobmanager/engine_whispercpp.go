@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"whisper-gui/internal/config"
 )
 
 // whisperCppPercentRe matches whisper.cpp's own progress line, e.g.
@@ -36,7 +38,7 @@ func (whisperCppEngine) MainArgs(job *Job, inputPath string) []string {
 	if lang == "" {
 		lang = "auto"
 	}
-	return []string{
+	args := []string{
 		"-m", job.Model,
 		"-f", inputPath,
 		"-of", filepath.Join(job.OutputDir, job.ID),
@@ -45,6 +47,19 @@ func (whisperCppEngine) MainArgs(job *Job, inputPath string) []string {
 		"-nt",
 		"-l", lang,
 	}
+	// whisper-cli has no equivalent to mlx_whisper's --condition-on-previous-text
+	// (it doesn't carry decoded text across windows by default in the first
+	// place), but a silent stretch can still make the model hallucinate a
+	// plausible-sounding phrase and repeat it -- VAD sidesteps this by
+	// skipping non-speech audio before it ever reaches the decoder, rather
+	// than transcribing silence and hoping the result is sane. Opt-in only:
+	// enabling it requires a separately-downloaded VAD model file, so a job
+	// with none configured runs exactly as before.
+	cfg, _ := config.Load()
+	if cfg.WhisperVadModelPath != "" {
+		args = append(args, "--vad", "-vm", cfg.WhisperVadModelPath)
+	}
+	return args
 }
 
 func (whisperCppEngine) ProgressPattern() *regexp.Regexp { return whisperCppPercentRe }

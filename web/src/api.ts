@@ -38,6 +38,7 @@ export function saveSettings(update: {
   whisperCliPath?: string
   whisperCppModelDir?: string
   defaultEngine?: EngineID | ''
+  whisperVadModelPath?: string
 }): Promise<SettingsResponse> {
   return request('/api/settings', { method: 'PUT', body: JSON.stringify(update) })
 }

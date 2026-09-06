@@ -19,6 +19,7 @@ type SettingsResponse struct {
 	WhisperCliResolvedVia string `json:"whisperCliResolvedVia"`
 	WhisperCppModelDir    string `json:"whisperCppModelDir"`
 	DefaultEngine         string `json:"defaultEngine"`
+	WhisperVadModelPath   string `json:"whisperVadModelPath"`
 }
 
 func currentSettings() SettingsResponse {
@@ -35,6 +36,7 @@ func currentSettings() SettingsResponse {
 		WhisperCliResolvedVia: string(wc.ResolvedVia),
 		WhisperCppModelDir:    cfg.WhisperCppModelDir,
 		DefaultEngine:         cfg.DefaultEngine,
+		WhisperVadModelPath:   cfg.WhisperVadModelPath,
 	}
 }
 
@@ -43,11 +45,12 @@ func handleGetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 type settingsUpdateRequest struct {
-	MlxWhisperPath     *string `json:"mlxWhisperPath,omitempty"`
-	FFmpegPath         *string `json:"ffmpegPath,omitempty"`
-	WhisperCliPath     *string `json:"whisperCliPath,omitempty"`
-	WhisperCppModelDir *string `json:"whisperCppModelDir,omitempty"`
-	DefaultEngine      *string `json:"defaultEngine,omitempty"`
+	MlxWhisperPath      *string `json:"mlxWhisperPath,omitempty"`
+	FFmpegPath          *string `json:"ffmpegPath,omitempty"`
+	WhisperCliPath      *string `json:"whisperCliPath,omitempty"`
+	WhisperCppModelDir  *string `json:"whisperCppModelDir,omitempty"`
+	DefaultEngine       *string `json:"defaultEngine,omitempty"`
+	WhisperVadModelPath *string `json:"whisperVadModelPath,omitempty"`
 }
 
 func handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +99,16 @@ func handlePutSettings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		cfg.WhisperCppModelDir = *req.WhisperCppModelDir
+	}
+	if req.WhisperVadModelPath != nil {
+		if *req.WhisperVadModelPath != "" {
+			info, statErr := os.Stat(*req.WhisperVadModelPath)
+			if statErr != nil || info.IsDir() {
+				writeJSONError(w, http.StatusBadRequest, "The specified VAD model path does not exist or is not a file")
+				return
+			}
+		}
+		cfg.WhisperVadModelPath = *req.WhisperVadModelPath
 	}
 	if req.DefaultEngine != nil {
 		if *req.DefaultEngine != "" && *req.DefaultEngine != jobmanager.EngineMlx && *req.DefaultEngine != jobmanager.EngineWhisperCpp {

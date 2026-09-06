@@ -70,6 +70,7 @@ export interface SettingsResponse {
   whisperCliResolvedVia: ResolvedVia
   whisperCppModelDir: string
   defaultEngine: EngineID | ''
+  whisperVadModelPath: string
 }
 
 export interface LogEvent {

@@ -12,6 +12,11 @@ type Config struct {
 	WhisperCliPath     string `json:"whisperCliPath,omitempty"`
 	WhisperCppModelDir string `json:"whisperCppModelDir,omitempty"`
 	DefaultEngine      string `json:"defaultEngine,omitempty"` // "" behaves as "mlx"
+	// WhisperVadModelPath, when set, enables whisper.cpp's Voice Activity
+	// Detection (a ggml-format Silero VAD model file, e.g. ggml-silero-v5.1.2.bin)
+	// so silent stretches are skipped before transcription instead of being
+	// guessed at -- empty disables VAD (whisper-cli runs exactly as before).
+	WhisperVadModelPath string `json:"whisperVadModelPath,omitempty"`
 }
 
 func Dir() (string, error) {

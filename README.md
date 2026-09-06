@@ -33,7 +33,7 @@ Both engines target Apple Silicon: `mlx_whisper` is built on Apple's [MLX](https
 
 All three binaries are auto-detected on `PATH` (with a pip user-install fallback for `mlx_whisper` only); if detection fails, set explicit paths in the app's Settings panel. If `mlx_whisper` isn't installed but `whisper-cli` is, the app automatically defaults to the whisper.cpp engine on first load (unless you've explicitly picked a default engine in Settings).
 
-> **Known limitation**: whisper.cpp has no direct equivalent to the `--condition-on-previous-text False` fix used for mlx_whisper's silence-triggered repetition-loop bug (see `notes/mlx-whisper-repetition-loop-bugfix.md`) — a long silent stretch may still cause repeated/hallucinated text. Spot-check `.srt` output from silence-heavy recordings when using the whisper.cpp engine.
+> **Silence-triggered repeated/hallucinated text**: mlx_whisper's version of this (see `notes/mlx-whisper-repetition-loop-bugfix.md`) is fixed via `--condition-on-previous-text False`. whisper.cpp has no direct equivalent of that flag, but it does support **Voice Activity Detection (VAD)**, which skips silent stretches before they ever reach the decoder — the actual fix for this failure mode. It's optional: download a ggml VAD model (e.g. `ggml-silero-v5.1.2.bin` from [`ggml-org/whisper-vad`](https://huggingface.co/ggml-org/whisper-vad) on Hugging Face) and set its path in the Settings panel's "whisper.cpp VAD model" field. Leave it unset and whisper.cpp runs exactly as before (no behavior change), but a silence-heavy recording is then worth spot-checking for repeated text.
 
 ### Build & run
 
@@ -114,7 +114,7 @@ See the `CLAUDE.md` file in each directory for implementation details.
 
 三个可执行文件默认都会从 `PATH` 中自动检测（仅 `mlx_whisper` 还有 pip 用户安装路径作为兜底）；如果自动检测失败，可在应用的设置面板手动指定路径。如果没有安装 `mlx_whisper` 但装了 `whisper-cli`，应用首次打开时会自动默认选中 whisper.cpp 引擎（除非你已经在设置里明确指定了默认引擎）。
 
-> **已知限制**：whisper.cpp 没有直接对应 mlx_whisper 那个 `--condition-on-previous-text False` 修复的选项（该修复用于解决静音触发的复读循环问题，详见 `notes/mlx-whisper-repetition-loop-bugfix.md`）——长时间静音片段仍可能导致复读或幻觉文本。使用 whisper.cpp 引擎转录静音较多的录音时，建议抽查一下 `.srt` 输出。
+> **静音触发复读/幻觉文本**：mlx_whisper 那个问题（详见 `notes/mlx-whisper-repetition-loop-bugfix.md`）是靠 `--condition-on-previous-text False` 修复的。whisper.cpp 没有直接对应这个选项的参数，但它支持 **VAD（语音活动检测）**——在音频进解码器之前就先跳过静音片段，这才是这类问题真正对症的修复方式。这项是可选的：下载一个 ggml 格式的 VAD 模型（例如 Hugging Face 上 [`ggml-org/whisper-vad`](https://huggingface.co/ggml-org/whisper-vad) 的 `ggml-silero-v5.1.2.bin`），然后在设置面板的 "whisper.cpp VAD model" 里填上路径。不填的话 whisper.cpp 行为跟之前完全一样(不影响现有配置)，但转录静音较多的录音时就值得抽查一下有没有复读。
 
 ### 构建与运行
 

@@ -58,6 +58,10 @@ export function openSettingsModal(onSaved?: () => void): void {
         modelDirInput.value = path
       })
     })
+    const vadModelInput = el('input', {
+      value: settings.whisperVadModelPath,
+      placeholder: '/path/to/ggml-silero-v5.1.2.bin (optional)',
+    })
 
     const engineSelect = el('select', {}, [
       el('option', { value: '' }, ['Auto (use whichever is available)']),
@@ -84,6 +88,7 @@ export function openSettingsModal(onSaved?: () => void): void {
           ffmpegPath: ffmpegInput.value,
           whisperCliPath: whisperCliInput.value,
           whisperCppModelDir: modelDirInput.value,
+          whisperVadModelPath: vadModelInput.value,
           defaultEngine: engineSelect.value as EngineID | '',
         })
         // Rebuilds the whole panel (fresh inputs/badges/buttons reflecting
@@ -112,6 +117,10 @@ export function openSettingsModal(onSaved?: () => void): void {
         resolvedBadge(settings.whisperCliResolvedVia),
       ]),
       el('label', { class: 'settings-field' }, ['whisper.cpp model directory', modelDirInput, browseModelDirBtn]),
+      el('label', { class: 'settings-field' }, [
+        'whisper.cpp VAD model (optional -- reduces repeated/hallucinated text during silence)',
+        vadModelInput,
+      ]),
       el('label', { class: 'settings-field' }, ['Default engine', engineSelect]),
       saveBtn,
       resultNote,
