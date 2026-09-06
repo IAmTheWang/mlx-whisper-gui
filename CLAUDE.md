@@ -7,7 +7,7 @@ A local macOS-only web GUI for batch video transcription to `.srt`. Go backend s
 - `cmd/whisper-gui` — binary entrypoint; starts the HTTP server on `:8787` (flag `-port`), handles graceful shutdown.
 - `internal/jobmanager` — the core: job state machine, a single-worker FIFO queue, the `Engine` abstraction (`mlx_whisper` vs whisper.cpp) that runs the transcription subprocess, SSE event fan-out.
 - `internal/server` — HTTP handlers (`net/http` `ServeMux`, Go 1.22+ method+pattern routing), embeds the built frontend via `go:embed`.
-- `internal/config` — tiny JSON config file (`~/Library/Application Support/whisper-gui/config.json`) for user-overridden binary paths and engine preference.
+- `internal/config` — tiny JSON config file (`~/Library/Application Support/whisper-gui/config.json`) for user-overridden binary paths, engine preference, and an optional whisper.cpp VAD model path.
 - `internal/whisperbin` — resolves the `mlx_whisper`/`ffmpeg`/`whisper-cli` binary paths (config override → `PATH` → known pip fallback for mlx_whisper only).
 - `web/` — the frontend: vanilla TypeScript + `el()`/`clear()` DOM helpers, no framework, built by Vite straight into `internal/server/dist` so `go:embed` needs no copy step.
 - `srt/` — local scratch folder for subtitle files pulled off this machine's whisper-gui job history; gitignored, not part of the app itself.
@@ -31,7 +31,7 @@ make run        # build + run the binary
 make test       # go test ./...
 ```
 
-External dependencies the app shells out to (not vendored): `mlx_whisper` (pip, Apple Silicon MLX build), whisper.cpp's `whisper-cli` (`brew install whisper-cpp`, no Python needed), and `ffmpeg` (Homebrew). All three are resolved at runtime by `internal/whisperbin`; the Settings panel in the UI lets the user override the paths if auto-detection fails, set the whisper.cpp model directory, and pick a default engine.
+External dependencies the app shells out to (not vendored): `mlx_whisper` (pip, Apple Silicon MLX build), whisper.cpp's `whisper-cli` (`brew install whisper-cpp`, no Python needed), and `ffmpeg` (Homebrew). All three are resolved at runtime by `internal/whisperbin`; the Settings panel in the UI lets the user override the paths if auto-detection fails, set the whisper.cpp model directory, pick a default engine, and optionally point at a downloaded VAD model to reduce whisper.cpp's silence-triggered repeated/hallucinated text (see `internal/jobmanager/CLAUDE.md`).
 
 ## Conventions
 

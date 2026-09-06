@@ -27,8 +27,10 @@ func main() {
 
 	mlx := whisperbin.LocateMlxWhisper()
 	ffmpeg := whisperbin.LocateFFmpeg()
+	whisperCli := whisperbin.LocateWhisperCli()
 	log.Printf("mlx_whisper: %s (%s)", describeResolution(mlx), mlx.ResolvedVia)
 	log.Printf("ffmpeg:      %s (%s)", describeResolution(ffmpeg), ffmpeg.ResolvedVia)
+	log.Printf("whisper-cli: %s (%s)", describeResolution(whisperCli), whisperCli.ResolvedVia)
 
 	addr := fmt.Sprintf(":%d", *port)
 	httpServer := server.NewHTTPServer(addr, server.New(jobs).Handler())

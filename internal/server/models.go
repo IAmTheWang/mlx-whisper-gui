@@ -111,6 +111,12 @@ func isModelCached(id string) bool {
 // whisper.cpp model directory (top-level only, not recursive). There is no
 // download step for this engine -- the user places ggml-*.bin files there
 // themselves -- so presence on disk is the only "cached" signal needed.
+//
+// A VAD model (config.WhisperVadModelPath) is a *.bin file too, and nothing
+// stops the user from downloading it into the same directory as their
+// transcription models -- so it's explicitly excluded here by path. It's a
+// VAD model, not a transcription model, and would fail or produce garbage if
+// passed to whisper-cli's -m.
 func scanWhisperCppModels() []ModelInfo {
 	models := []ModelInfo{} // never nil -- must serialize as JSON [] for the frontend, not null
 	cfg, err := config.Load()
@@ -126,6 +132,9 @@ func scanWhisperCppModels() []ModelInfo {
 			continue
 		}
 		path := filepath.Join(cfg.WhisperCppModelDir, e.Name())
+		if cfg.WhisperVadModelPath != "" && path == cfg.WhisperVadModelPath {
+			continue
+		}
 		label := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
 		models = append(models, ModelInfo{ID: path, Label: label, Cached: true, Engine: jobmanager.EngineWhisperCpp})
 	}
