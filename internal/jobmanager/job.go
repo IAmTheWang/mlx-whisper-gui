@@ -67,6 +67,7 @@ type Job struct {
 	VideoPath string
 	Model     string
 	Language  string
+	Engine    string
 	OutputDir string
 	CreatedAt time.Time
 
@@ -87,12 +88,13 @@ type Job struct {
 	runner       *Runner
 }
 
-func newJob(id, videoPath, model, language, outputDir string, createdAt time.Time) *Job {
+func newJob(id, videoPath, model, language, engine, outputDir string, createdAt time.Time) *Job {
 	return &Job{
 		ID:        id,
 		VideoPath: videoPath,
 		Model:     model,
 		Language:  language,
+		Engine:    engine,
 		OutputDir: outputDir,
 		CreatedAt: createdAt,
 		state:     Queued,
@@ -113,6 +115,7 @@ type Snapshot struct {
 	VideoPath       string     `json:"videoPath"`
 	Model           string     `json:"model"`
 	Language        string     `json:"language"`
+	Engine          string     `json:"engine"`
 	OutputDir       string     `json:"outputDir"`
 	State           State      `json:"state"`
 	CreatedAt       time.Time  `json:"createdAt"`
@@ -128,22 +131,11 @@ func (j *Job) Snapshot() Snapshot {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return Snapshot{
-		ID: j.ID, VideoPath: j.VideoPath, Model: j.Model, Language: j.Language,
+		ID: j.ID, VideoPath: j.VideoPath, Model: j.Model, Language: j.Language, Engine: j.Engine,
 		OutputDir: j.OutputDir, State: j.state, CreatedAt: j.CreatedAt,
 		StartedAt: j.startedAt, FinishedAt: j.finishedAt, Error: j.errMsg, SRTPath: j.srtPath,
 		SRTSidecarPath: j.srtSidecarPath, SRTSidecarError: j.srtSidecarError,
 	}
-}
-
-// setSidecar records the outcome of best-effort copying the finished .srt
-// next to the source video. A failure here (read-only volume, permission
-// denied, disk full) does not affect the job's own State -- the
-// transcription itself already succeeded; this is a secondary convenience.
-func (j *Job) setSidecar(path, errMsg string) {
-	j.mu.Lock()
-	j.srtSidecarPath = path
-	j.srtSidecarError = errMsg
-	j.mu.Unlock()
 }
 
 func (j *Job) transition(to State, mutate func()) error {
@@ -174,11 +166,17 @@ func (j *Job) markRunning(r *Runner) error {
 	})
 }
 
-func (j *Job) markDone(srtPath string) error {
+// markDone also sets the sidecar-copy outcome atomically with the Done
+// transition itself (rather than via a separate setSidecar call afterwards)
+// so a concurrent reader can never observe a Done job with stale/missing
+// sidecar info.
+func (j *Job) markDone(srtPath, sidecarPath, sidecarErr string) error {
 	now := time.Now()
 	return j.transition(Done, func() {
 		j.finishedAt = &now
 		j.srtPath = srtPath
+		j.srtSidecarPath = sidecarPath
+		j.srtSidecarError = sidecarErr
 	})
 }
 
@@ -213,6 +211,18 @@ func (j *Job) runnerRef() *Runner {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return j.runner
+}
+
+// replaceRunner swaps the active runner reference without a state transition.
+// Some engines run more than one subprocess phase while the job stays
+// Running (e.g. whisper.cpp's ffmpeg-prepare phase followed by its main
+// whisper-cli phase) -- markRunning only fires on the Queued->Running
+// transition, so later phases use this instead to keep Cancel() working
+// against whichever subprocess is actually active.
+func (j *Job) replaceRunner(r *Runner) {
+	j.mu.Lock()
+	j.runner = r
+	j.mu.Unlock()
 }
 
 // appendLog records a real log line in the capped in-memory ring buffer and

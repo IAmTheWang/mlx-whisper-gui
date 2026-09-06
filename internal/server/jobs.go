@@ -12,6 +12,7 @@ type createJobRequest struct {
 	VideoPath string `json:"videoPath"`
 	Model     string `json:"model"`
 	Language  string `json:"language"`
+	Engine    string `json:"engine"`
 }
 
 func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +21,14 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	if !isKnownModel(req.Model) {
+	if req.Engine == "" {
+		req.Engine = jobmanager.EngineMlx
+	}
+	if !isKnownEngine(req.Engine) {
+		writeJSONError(w, http.StatusBadRequest, "Unknown engine: "+req.Engine)
+		return
+	}
+	if !isKnownModel(req.Model, req.Engine) {
 		writeJSONError(w, http.StatusBadRequest, "Unknown model: "+req.Model)
 		return
 	}
@@ -33,6 +41,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		VideoPath: req.VideoPath,
 		Model:     req.Model,
 		Language:  req.Language,
+		Engine:    req.Engine,
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, err.Error())

@@ -1,10 +1,12 @@
 import './style.css'
-import { createJob, listModels } from './api'
+import { createJob, getSettings, listModels } from './api'
+import type { EngineID } from './types'
 import { el } from './dom'
 import { renderBrowser } from './views/browser'
 import { renderJobForm, type JobFormController } from './views/jobForm'
 import { renderJobList } from './views/jobList'
 import { renderJobDetail, type JobDetailController } from './views/jobDetail'
+import { openSettingsModal } from './views/settings'
 
 async function main() {
   const app = document.querySelector<HTMLDivElement>('#app')
@@ -15,8 +17,10 @@ async function main() {
   const formPane = el('div', { class: 'pane-form' })
   const listPane = el('div', { class: 'pane-list' })
   const detailPane = el('div', { class: 'pane-detail' })
+  const settingsBtn = el('button', { class: 'settings-open-btn' }, ['⚙ Settings'])
 
   app.append(
+    el('div', { class: 'app-header' }, [settingsBtn]),
     el('div', { class: 'app-layout' }, [
       el('div', { class: 'col-left' }, [browserPane, formPane]),
       el('div', { class: 'col-right' }, [listPane, detailPane]),
@@ -26,6 +30,13 @@ async function main() {
   let selectedPaths: string[] = []
   let form: JobFormController | undefined
   let detailController: JobDetailController | undefined
+  let currentEngine: EngineID = 'mlx'
+
+  settingsBtn.addEventListener('click', () => {
+    openSettingsModal(() => {
+      void refreshModels(currentEngine)
+    })
+  })
 
   const jobList = renderJobList(listPane, {
     onSelect: (id) => openJobDetail(id),
@@ -45,9 +56,30 @@ async function main() {
     },
   })
 
-  const { models, languages } = await listModels()
-  form = renderJobForm(formPane, models, languages, {
-    onStart: async (model, language) => {
+  async function refreshModels(engine: EngineID) {
+    const { models } = await listModels(engine)
+    form?.setModels(models)
+  }
+
+  const settings = await getSettings()
+  if (settings.defaultEngine === 'mlx' || settings.defaultEngine === 'whispercpp') {
+    currentEngine = settings.defaultEngine
+  } else {
+    // defaultEngine unset -- auto-pick whichever binary is actually resolvable,
+    // so a fresh Mac with only `brew install whisper-cpp` (no Python/mlx_whisper
+    // set up) doesn't land on an engine with zero usable models by default.
+    const mlxAvailable = settings.mlxResolvedVia !== 'none'
+    const whisperCliAvailable = settings.whisperCliResolvedVia !== 'none'
+    if (!mlxAvailable && whisperCliAvailable) currentEngine = 'whispercpp'
+  }
+
+  const { models, languages } = await listModels(currentEngine)
+  form = renderJobForm(formPane, currentEngine, models, languages, {
+    onEngineChange: (engine) => {
+      currentEngine = engine
+      void refreshModels(engine)
+    },
+    onStart: async (engine, model, language) => {
       const paths = [...selectedPaths]
 
       const overwriteNames = paths
@@ -64,7 +96,7 @@ async function main() {
       let lastJobId: string | undefined
       for (const videoPath of paths) {
         try {
-          const job = await createJob({ videoPath, model, language })
+          const job = await createJob({ videoPath, engine, model, language })
           lastJobId = job.id
         } catch (err) {
           alert(`Failed to create job (${videoPath}): ${(err as Error).message}`)

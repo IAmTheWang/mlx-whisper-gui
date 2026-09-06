@@ -5,12 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"whisper-gui/internal/config"
+	"whisper-gui/internal/jobmanager"
 )
 
 type ModelInfo struct {
 	ID     string `json:"id"`
 	Label  string `json:"label"`
 	Cached bool   `json:"cached"`
+	Engine string `json:"engine"`
 }
 
 type LanguageInfo struct {
@@ -43,7 +47,22 @@ var curatedLanguages = []LanguageInfo{
 	{"ru", "Russian"},
 }
 
-func isKnownModel(id string) bool {
+func isKnownEngine(engine string) bool {
+	return engine == jobmanager.EngineMlx || engine == jobmanager.EngineWhisperCpp
+}
+
+// isKnownModel validates a model id for the given engine: mlx checks against
+// the static curatedModels list, whispercpp re-scans the configured model
+// directory so only a file actually present there can be passed to -m.
+func isKnownModel(id, engine string) bool {
+	if engine == jobmanager.EngineWhisperCpp {
+		for _, m := range scanWhisperCppModels() {
+			if m.ID == id {
+				return true
+			}
+		}
+		return false
+	}
 	for _, m := range curatedModels {
 		if m.ID == id {
 			return true
@@ -88,10 +107,49 @@ func isModelCached(id string) bool {
 	return false
 }
 
+// scanWhisperCppModels lists the *.bin files directly inside the configured
+// whisper.cpp model directory (top-level only, not recursive). There is no
+// download step for this engine -- the user places ggml-*.bin files there
+// themselves -- so presence on disk is the only "cached" signal needed.
+func scanWhisperCppModels() []ModelInfo {
+	models := []ModelInfo{} // never nil -- must serialize as JSON [] for the frontend, not null
+	cfg, err := config.Load()
+	if err != nil || cfg.WhisperCppModelDir == "" {
+		return models
+	}
+	entries, err := os.ReadDir(cfg.WhisperCppModelDir)
+	if err != nil {
+		return models
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".bin") {
+			continue
+		}
+		path := filepath.Join(cfg.WhisperCppModelDir, e.Name())
+		label := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+		models = append(models, ModelInfo{ID: path, Label: label, Cached: true, Engine: jobmanager.EngineWhisperCpp})
+	}
+	return models
+}
+
 func handleModels(w http.ResponseWriter, r *http.Request) {
-	models := make([]ModelInfo, 0, len(curatedModels))
-	for _, m := range curatedModels {
-		models = append(models, ModelInfo{ID: m.ID, Label: m.Label, Cached: isModelCached(m.ID)})
+	engine := r.URL.Query().Get("engine")
+	if engine == "" {
+		engine = jobmanager.EngineMlx
+	}
+	if !isKnownEngine(engine) {
+		writeJSONError(w, http.StatusBadRequest, "Unknown engine: "+engine)
+		return
+	}
+
+	var models []ModelInfo
+	if engine == jobmanager.EngineWhisperCpp {
+		models = scanWhisperCppModels()
+	} else {
+		models = make([]ModelInfo, 0, len(curatedModels))
+		for _, m := range curatedModels {
+			models = append(models, ModelInfo{ID: m.ID, Label: m.Label, Cached: isModelCached(m.ID), Engine: jobmanager.EngineMlx})
+		}
 	}
 	writeJSON(w, http.StatusOK, ModelsResponse{Models: models, Languages: curatedLanguages})
 }

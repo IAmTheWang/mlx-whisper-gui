@@ -7,8 +7,11 @@ import (
 )
 
 type Config struct {
-	MlxWhisperPath string `json:"mlxWhisperPath,omitempty"`
-	FFmpegPath     string `json:"ffmpegPath,omitempty"`
+	MlxWhisperPath     string `json:"mlxWhisperPath,omitempty"`
+	FFmpegPath         string `json:"ffmpegPath,omitempty"`
+	WhisperCliPath     string `json:"whisperCliPath,omitempty"`
+	WhisperCppModelDir string `json:"whisperCppModelDir,omitempty"`
+	DefaultEngine      string `json:"defaultEngine,omitempty"` // "" behaves as "mlx"
 }
 
 func Dir() (string, error) {

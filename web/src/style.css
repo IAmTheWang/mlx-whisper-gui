@@ -9,6 +9,21 @@ body {
   padding: 16px;
 }
 
+.app-header {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 1200px;
+  margin: 0 auto 8px;
+}
+.settings-open-btn {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .app-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -365,4 +380,106 @@ body {
   color: #c0392b;
   padding: 16px;
   white-space: pre-wrap;
+}
+
+/* settings modal */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.settings-panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.settings-close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.settings-field input,
+.settings-field select {
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+.settings-browse-btn {
+  align-self: flex-start;
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-save-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings-save-btn:disabled {
+  background: #b0b8c4;
+  cursor: not-allowed;
+}
+.settings-result {
+  font-size: 12px;
+  margin-top: 8px;
+}
+.settings-result-ok {
+  color: #2e7d32;
+}
+.settings-result-error {
+  color: #c0392b;
+}
+.settings-status,
+.settings-error {
+  color: #888;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.settings-error {
+  color: #c0392b;
+}
+.resolved-badge {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eee;
+  color: #666;
+}
+.resolved-badge.resolved-none {
+  background: #fdecea;
+  color: #c0392b;
 }

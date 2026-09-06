@@ -2,7 +2,7 @@
 
 [English](#english) | [中文](#中文)
 
-A local, **macOS-only** web GUI wrapping [`mlx_whisper`](https://github.com/ml-explore/mlx-examples/tree/main/whisper) for batch video transcription to `.srt` subtitle files. A Go backend serves a small vanilla TypeScript/Vite frontend (no framework) and drives `mlx_whisper`/`ffmpeg` as subprocesses.
+A local, **macOS-only** web GUI for batch video transcription to `.srt` subtitle files. A Go backend serves a small vanilla TypeScript/Vite frontend (no framework) and drives one of two transcription engines as a subprocess: [`mlx_whisper`](https://github.com/ml-explore/mlx-examples/tree/main/whisper) (Python/MLX) or [whisper.cpp](https://github.com/ggml-org/whisper.cpp)'s `whisper-cli` (pure C/C++, no Python dependency at all). `ffmpeg` is used by both.
 
 ---
 
@@ -10,26 +10,30 @@ A local, **macOS-only** web GUI wrapping [`mlx_whisper`](https://github.com/ml-e
 
 ### Why macOS-only
 
-`mlx_whisper` is built on Apple's [MLX](https://github.com/ml-explore/mlx) framework, which targets Apple Silicon's unified-memory architecture. It does not run on Intel Macs, Windows, or Linux. The app's config/job-history storage path (`~/Library/Application Support/whisper-gui/`) is also macOS-specific.
+Both engines target Apple Silicon: `mlx_whisper` is built on Apple's [MLX](https://github.com/ml-explore/mlx) framework, and whisper.cpp is typically installed via a Homebrew formula built with Metal acceleration. The app's config/job-history storage path (`~/Library/Application Support/whisper-gui/`) is also macOS-specific.
 
 ### Features
 
 - Server-side file browser to pick one or more video files (checkbox multi-select, video files only).
-- Pick a Whisper model and language, then queue transcription jobs.
-- Jobs run **one at a time** — MLX's unified-memory GPU path gains nothing from parallel jobs on a single Mac, so a single-worker FIFO queue avoids GPU memory contention.
+- Pick an engine (`mlx_whisper` or whisper.cpp), a model, and a language, then queue transcription jobs.
+- Jobs run **one at a time**, regardless of engine — a single-worker FIFO queue avoids GPU memory contention (MLX's unified-memory GPU path gains nothing from parallel jobs on a single Mac).
 - Live job progress and logs via Server-Sent Events (auto-reconnect, log replay after a server restart).
 - Cancel a running or queued job.
 - Download the resulting `.srt`; a copy is also saved next to the source video (best-effort).
-- Settings page to override the `mlx_whisper`/`ffmpeg` binary paths if auto-detection fails.
+- Settings panel to override the `mlx_whisper`/`ffmpeg`/`whisper-cli` binary paths if auto-detection fails, set the whisper.cpp model directory, and pick a default engine.
 
 ### Requirements
 
 - macOS on Apple Silicon (M1/M2/M3/M4).
-- [`mlx_whisper`](https://pypi.org/project/mlx-whisper/) installed via pip.
-- [`ffmpeg`](https://ffmpeg.org/) installed, e.g. via Homebrew (`brew install ffmpeg`).
+- At least one transcription engine:
+  - [`mlx_whisper`](https://pypi.org/project/mlx-whisper/) installed via pip, **or**
+  - whisper.cpp's `whisper-cli` installed via Homebrew (`brew install whisper-cpp`) — no Python/pip setup needed at all, which makes it the simpler choice on a freshly set-up Mac. Model files (`ggml-*.bin`) must be downloaded manually into a directory of your choice, then pointed at from Settings; there is no auto-download for this engine.
+- [`ffmpeg`](https://ffmpeg.org/) installed, e.g. via Homebrew (`brew install ffmpeg`) — required by both engines (whisper.cpp uses it directly to convert video into 16kHz mono WAV before transcribing; mlx_whisper calls it internally).
 - Go 1.26+ and [Bun](https://bun.sh) (for building from source).
 
-Both binaries are auto-detected on `PATH` (with a pip user-install fallback for `mlx_whisper`); if detection fails, set explicit paths in the app's Settings page.
+All three binaries are auto-detected on `PATH` (with a pip user-install fallback for `mlx_whisper` only); if detection fails, set explicit paths in the app's Settings panel. If `mlx_whisper` isn't installed but `whisper-cli` is, the app automatically defaults to the whisper.cpp engine on first load (unless you've explicitly picked a default engine in Settings).
+
+> **Known limitation**: whisper.cpp has no direct equivalent to the `--condition-on-previous-text False` fix used for mlx_whisper's silence-triggered repetition-loop bug (see `notes/mlx-whisper-repetition-loop-bugfix.md`) — a long silent stretch may still cause repeated/hallucinated text. Spot-check `.srt` output from silence-heavy recordings when using the whisper.cpp engine.
 
 ### Build & run
 
@@ -73,10 +77,10 @@ All job history, subprocess logs, and generated `.srt` files live under `~/Libra
 ### Project structure
 
 - `cmd/whisper-gui` — binary entrypoint; flag parsing, startup wiring, graceful shutdown.
-- `internal/jobmanager` — job state machine, single-worker FIFO transcription queue, subprocess execution, SSE event fan-out.
+- `internal/jobmanager` — job state machine, single-worker FIFO transcription queue, the `Engine` abstraction over `mlx_whisper`/whisper.cpp, subprocess execution, SSE event fan-out.
 - `internal/server` — HTTP handlers (standard library `net/http`), embeds the built frontend via `go:embed`.
-- `internal/config` — JSON config file for user-overridden binary paths.
-- `internal/whisperbin` — resolves `mlx_whisper`/`ffmpeg` binary paths.
+- `internal/config` — JSON config file for user-overridden binary paths, whisper.cpp model directory, and default engine.
+- `internal/whisperbin` — resolves `mlx_whisper`/`ffmpeg`/`whisper-cli` binary paths.
 - `web/` — vanilla TypeScript + Vite frontend, built straight into `internal/server/dist`.
 
 See the `CLAUDE.md` file in each directory for implementation details.
@@ -87,26 +91,30 @@ See the `CLAUDE.md` file in each directory for implementation details.
 
 ### 为什么只支持 macOS
 
-`mlx_whisper` 基于苹果的 [MLX](https://github.com/ml-explore/mlx) 框架构建，该框架针对 Apple Silicon 的统一内存架构设计，无法在 Intel Mac、Windows 或 Linux 上运行。此外，本应用的配置和任务历史存储路径（`~/Library/Application Support/whisper-gui/`）也是 macOS 专属路径。
+两个引擎都是面向 Apple Silicon 设计的：`mlx_whisper` 基于苹果的 [MLX](https://github.com/ml-explore/mlx) 框架构建；whisper.cpp 通常通过 Homebrew 安装，构建时启用了 Metal 加速。此外，本应用的配置和任务历史存储路径（`~/Library/Application Support/whisper-gui/`）也是 macOS 专属路径。
 
 ### 功能特性
 
 - 服务端文件浏览器，可勾选一个或多个视频文件（多选，仅视频文件可选）。
-- 选择 Whisper 模型和语言，将转写任务加入队列。
-- 任务**串行执行**——MLX 的统一内存 GPU 架构在单台 Mac 上并行跑多个任务并不能带来收益，单 worker 的 FIFO 队列可以避免 GPU 内存争用。
+- 选择引擎（`mlx_whisper` 或 whisper.cpp）、模型和语言，将转写任务加入队列。
+- 任务**串行执行**，与引擎无关——单 worker 的 FIFO 队列可以避免 GPU 内存争用（MLX 的统一内存 GPU 架构在单台 Mac 上并行跑多个任务并不能带来收益）。
 - 通过 Server-Sent Events 实时展示任务进度与日志（自动重连，服务重启后可回放历史日志）。
 - 支持取消排队中或正在运行的任务。
 - 转写完成后可下载 `.srt` 文件，同时会尽力在源视频旁保存一份副本。
-- 设置页面可在自动检测失败时手动指定 `mlx_whisper`/`ffmpeg` 的可执行文件路径。
+- 设置面板可在自动检测失败时手动指定 `mlx_whisper`/`ffmpeg`/`whisper-cli` 的可执行文件路径，设置 whisper.cpp 模型目录，并选择默认引擎。
 
 ### 环境要求
 
 - 搭载 Apple Silicon（M1/M2/M3/M4）芯片的 macOS。
-- 通过 pip 安装的 [`mlx_whisper`](https://pypi.org/project/mlx-whisper/)。
-- 已安装 [`ffmpeg`](https://ffmpeg.org/)，例如通过 Homebrew 安装（`brew install ffmpeg`）。
+- 至少安装一个转录引擎：
+  - 通过 pip 安装的 [`mlx_whisper`](https://pypi.org/project/mlx-whisper/)，**或者**
+  - 通过 Homebrew 安装的 whisper.cpp 的 `whisper-cli`（`brew install whisper-cpp`）——完全不需要搭建 Python/pip 环境，在全新安装的 Mac 上是更简单的选择。模型文件（`ggml-*.bin`）需要手动下载到自选目录，再到设置里指定该目录；这个引擎没有自动下载功能。
+- 已安装 [`ffmpeg`](https://ffmpeg.org/)，例如通过 Homebrew 安装（`brew install ffmpeg`）——两个引擎都需要它（whisper.cpp 会直接调用它把视频转成 16kHz 单声道 WAV 再转录；mlx_whisper 则是内部自行调用）。
 - 若需从源码构建：Go 1.26+ 和 [Bun](https://bun.sh)。
 
-两个可执行文件默认会从 `PATH` 中自动检测（`mlx_whisper` 还有 pip 用户安装路径作为兜底）；如果自动检测失败，可在应用的设置页面手动指定路径。
+三个可执行文件默认都会从 `PATH` 中自动检测（仅 `mlx_whisper` 还有 pip 用户安装路径作为兜底）；如果自动检测失败，可在应用的设置面板手动指定路径。如果没有安装 `mlx_whisper` 但装了 `whisper-cli`，应用首次打开时会自动默认选中 whisper.cpp 引擎（除非你已经在设置里明确指定了默认引擎）。
+
+> **已知限制**：whisper.cpp 没有直接对应 mlx_whisper 那个 `--condition-on-previous-text False` 修复的选项（该修复用于解决静音触发的复读循环问题，详见 `notes/mlx-whisper-repetition-loop-bugfix.md`）——长时间静音片段仍可能导致复读或幻觉文本。使用 whisper.cpp 引擎转录静音较多的录音时，建议抽查一下 `.srt` 输出。
 
 ### 构建与运行
 
@@ -150,10 +158,10 @@ make dev-watch        # dev-api-watch + dev-web 一起启动
 ### 项目结构
 
 - `cmd/whisper-gui` —— 二进制入口：命令行参数解析、启动装配、优雅关闭。
-- `internal/jobmanager` —— 任务状态机、单 worker 的 FIFO 转写队列、子进程执行、SSE 事件分发。
+- `internal/jobmanager` —— 任务状态机、单 worker 的 FIFO 转写队列、`mlx_whisper`/whisper.cpp 的 `Engine` 抽象、子进程执行、SSE 事件分发。
 - `internal/server` —— HTTP 处理层（标准库 `net/http`），通过 `go:embed` 内嵌构建好的前端。
-- `internal/config` —— JSON 配置文件，保存用户自定义的可执行文件路径。
-- `internal/whisperbin` —— 负责解析 `mlx_whisper`/`ffmpeg` 的可执行文件路径。
+- `internal/config` —— JSON 配置文件，保存用户自定义的可执行文件路径、whisper.cpp 模型目录、默认引擎。
+- `internal/whisperbin` —— 负责解析 `mlx_whisper`/`ffmpeg`/`whisper-cli` 的可执行文件路径。
 - `web/` —— 原生 TypeScript + Vite 前端，直接构建到 `internal/server/dist`。
 
 更多实现细节参见各目录下的 `CLAUDE.md` 文件。

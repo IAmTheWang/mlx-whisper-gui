@@ -12,12 +12,27 @@ import (
 
 func newTestManager(t *testing.T, mlxScriptPath string) *Manager {
 	t.Helper()
+	return newTestManagerFull(t, mlxScriptPath, "/usr/bin/true", "")
+}
+
+// newTestManagerFull is the general form: an empty whisperCliScriptPath
+// resolves whisper-cli as ViaNone (not found), matching a machine that never
+// installed it -- most tests only care about the mlx_whisper path and use
+// newTestManager instead.
+func newTestManagerFull(t *testing.T, mlxScriptPath, ffmpegScriptPath, whisperCliScriptPath string) *Manager {
+	t.Helper()
 	m, err := newManagerWithBaseDir(t.TempDir(),
 		func() whisperbin.Resolution {
 			return whisperbin.Resolution{Path: mlxScriptPath, ResolvedVia: whisperbin.ViaPath}
 		},
 		func() whisperbin.Resolution {
-			return whisperbin.Resolution{Path: "/usr/bin/true", ResolvedVia: whisperbin.ViaPath}
+			return whisperbin.Resolution{Path: ffmpegScriptPath, ResolvedVia: whisperbin.ViaPath}
+		},
+		func() whisperbin.Resolution {
+			if whisperCliScriptPath == "" {
+				return whisperbin.Resolution{ResolvedVia: whisperbin.ViaNone}
+			}
+			return whisperbin.Resolution{Path: whisperCliScriptPath, ResolvedVia: whisperbin.ViaPath}
 		},
 	)
 	if err != nil {
@@ -54,6 +69,52 @@ sleep %v
 %s
 exit %d
 `, sleepSeconds, createLine, exitCode)
+	if err := os.WriteFile(scriptPath, []byte(content), 0o755); err != nil {
+		t.Fatalf("write fake script: %v", err)
+	}
+	return scriptPath
+}
+
+// writeFakeWhisperCli generates a stand-in for whisper-cli: it parses -of the
+// same way the real tool does (each -o* flag appends its own extension, so
+// -osrt + -of <path> writes <path>.srt), sleeps for a controllable duration,
+// and exits with a controllable code. It deliberately ignores -f/-m -- these
+// tests exercise Manager's orchestration, not whisper-cli's actual behavior.
+func writeFakeWhisperCli(t *testing.T, sleepSeconds float64, exitCode int, createSRT bool) string {
+	t.Helper()
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "fake_whisper_cli.sh")
+	createLine := `[ -n "$of" ] && echo "fake transcript" > "$of.srt"`
+	if !createSRT {
+		createLine = ":"
+	}
+	content := fmt.Sprintf(`#!/bin/sh
+of=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -of) of="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+sleep %v
+%s
+exit %d
+`, sleepSeconds, createLine, exitCode)
+	if err := os.WriteFile(scriptPath, []byte(content), 0o755); err != nil {
+		t.Fatalf("write fake script: %v", err)
+	}
+	return scriptPath
+}
+
+// writeFakeFFmpeg generates a stand-in for the ffmpeg preprocessing step in
+// whisperCppEngine.PrepareCommand: it ignores its args entirely and just
+// sleeps for a controllable duration, so tests can exercise cancellation
+// while that phase is "running".
+func writeFakeFFmpeg(t *testing.T, sleepSeconds float64) string {
+	t.Helper()
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "fake_ffmpeg.sh")
+	content := fmt.Sprintf("#!/bin/sh\nsleep %v\nexit 0\n", sleepSeconds)
 	if err := os.WriteFile(scriptPath, []byte(content), 0o755); err != nil {
 		t.Fatalf("write fake script: %v", err)
 	}
@@ -244,6 +305,59 @@ func TestManager_CancelWhileRunning_Terminates(t *testing.T) {
 	}
 
 	final := waitForState(t, job, 5*time.Second) // well before the fake's 30s sleep would finish on its own
+	if final != Cancelled {
+		t.Fatalf("expected Cancelled, got %s", final)
+	}
+}
+
+func TestManager_WhisperCpp_HappyPath_QueuedRunningDone(t *testing.T) {
+	whisperCli := writeFakeWhisperCli(t, 0, 0, true)
+	m := newTestManagerFull(t, "/usr/bin/true", "/usr/bin/true", whisperCli)
+
+	job, err := m.CreateJob(CreateRequest{VideoPath: mustTempVideo(t), Model: "/models/ggml-small.bin", Language: "ja", Engine: EngineWhisperCpp})
+	if err != nil {
+		t.Fatalf("CreateJob: %v", err)
+	}
+
+	final := waitForState(t, job, 5*time.Second)
+	if final != Done {
+		t.Fatalf("expected job to end Done, got %s (error: %s)", final, job.Snapshot().Error)
+	}
+	snap := job.Snapshot()
+	if snap.Engine != EngineWhisperCpp {
+		t.Fatalf("expected Engine %q on the snapshot, got %q", EngineWhisperCpp, snap.Engine)
+	}
+	if snap.SRTPath == "" {
+		t.Fatal("expected SRTPath to be set on a Done job")
+	}
+	if _, err := os.Stat(snap.SRTPath); err != nil {
+		t.Fatalf("expected srt file to exist at %s: %v", snap.SRTPath, err)
+	}
+}
+
+// TestManager_WhisperCpp_CancelDuringPrepare proves cancellation works even
+// while the job is still in whisper.cpp's ffmpeg-prepare phase, before the
+// main whisper-cli runner has been created -- this exercises Job.replaceRunner,
+// since markRunning only fires once, on the Queued->Running transition.
+func TestManager_WhisperCpp_CancelDuringPrepare(t *testing.T) {
+	slowFFmpeg := writeFakeFFmpeg(t, 30)
+	whisperCli := writeFakeWhisperCli(t, 0, 0, true)
+	m := newTestManagerFull(t, "/usr/bin/true", slowFFmpeg, whisperCli)
+
+	job, err := m.CreateJob(CreateRequest{VideoPath: mustTempVideo(t), Model: "/models/ggml-small.bin", Language: "ja", Engine: EngineWhisperCpp})
+	if err != nil {
+		t.Fatalf("CreateJob: %v", err)
+	}
+	time.Sleep(150 * time.Millisecond)
+	if job.State() != Running {
+		t.Fatalf("expected job to be Running (in the prepare phase), got %s", job.State())
+	}
+
+	if err := m.CancelJob(job.ID); err != nil {
+		t.Fatalf("CancelJob: %v", err)
+	}
+
+	final := waitForState(t, job, 5*time.Second) // well before the fake ffmpeg's 30s sleep would finish on its own
 	if final != Cancelled {
 		t.Fatalf("expected Cancelled, got %s", final)
 	}

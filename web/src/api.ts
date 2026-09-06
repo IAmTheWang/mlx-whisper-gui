@@ -1,4 +1,4 @@
-import type { BrowseResponse, Job, ModelsResponse, SettingsResponse } from './types'
+import type { BrowseResponse, EngineID, Job, ModelsResponse, SettingsResponse } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -24,19 +24,25 @@ export function browseDir(path?: string): Promise<BrowseResponse> {
   return request(`/api/browse${qs}`)
 }
 
-export function listModels(): Promise<ModelsResponse> {
-  return request('/api/models')
+export function listModels(engine: EngineID = 'mlx'): Promise<ModelsResponse> {
+  return request(`/api/models?engine=${encodeURIComponent(engine)}`)
 }
 
 export function getSettings(): Promise<SettingsResponse> {
   return request('/api/settings')
 }
 
-export function saveSettings(update: { mlxWhisperPath?: string; ffmpegPath?: string }): Promise<SettingsResponse> {
+export function saveSettings(update: {
+  mlxWhisperPath?: string
+  ffmpegPath?: string
+  whisperCliPath?: string
+  whisperCppModelDir?: string
+  defaultEngine?: EngineID | ''
+}): Promise<SettingsResponse> {
   return request('/api/settings', { method: 'PUT', body: JSON.stringify(update) })
 }
 
-export function createJob(req: { videoPath: string; model: string; language: string }): Promise<Job> {
+export function createJob(req: { videoPath: string; engine: EngineID; model: string; language: string }): Promise<Job> {
   return request('/api/jobs', { method: 'POST', body: JSON.stringify(req) })
 }
 

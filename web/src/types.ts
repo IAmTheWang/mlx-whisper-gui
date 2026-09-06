@@ -1,10 +1,13 @@
 export type JobState = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
 
+export type EngineID = 'mlx' | 'whispercpp'
+
 export interface Job {
   id: string
   videoPath: string
   model: string
   language: string
+  engine: EngineID
   outputDir: string
   state: JobState
   createdAt: string
@@ -43,6 +46,7 @@ export interface ModelInfo {
   id: string
   label: string
   cached: boolean
+  engine: EngineID
 }
 
 export interface LanguageInfo {
@@ -55,11 +59,17 @@ export interface ModelsResponse {
   languages: LanguageInfo[]
 }
 
+export type ResolvedVia = 'config' | 'path' | 'fallback' | 'none'
+
 export interface SettingsResponse {
   mlxWhisperPath: string
-  mlxResolvedVia: 'config' | 'path' | 'fallback' | 'none'
+  mlxResolvedVia: ResolvedVia
   ffmpegPath: string
-  ffmpegResolvedVia: 'config' | 'path' | 'fallback' | 'none'
+  ffmpegResolvedVia: ResolvedVia
+  whisperCliPath: string
+  whisperCliResolvedVia: ResolvedVia
+  whisperCppModelDir: string
+  defaultEngine: EngineID | ''
 }
 
 export interface LogEvent {

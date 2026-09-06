@@ -1,14 +1,14 @@
 # whisper-gui
 
-A local macOS-only web GUI wrapping `mlx_whisper` for batch video transcription to `.srt`. Go backend serves a small vanilla TS/Vite frontend (no framework) and drives `mlx_whisper`/`ffmpeg` as subprocesses.
+A local macOS-only web GUI for batch video transcription to `.srt`. Go backend serves a small vanilla TS/Vite frontend (no framework) and drives one of two transcription engines as a subprocess: `mlx_whisper` (Python/MLX) or whisper.cpp's `whisper-cli` (no Python dependency at all). `ffmpeg` is used by both, either internally (mlx_whisper) or invoked directly (whisper.cpp's video→WAV preprocessing).
 
 ## Architecture
 
 - `cmd/whisper-gui` — binary entrypoint; starts the HTTP server on `:8787` (flag `-port`), handles graceful shutdown.
-- `internal/jobmanager` — the core: job state machine, a single-worker FIFO queue that runs `mlx_whisper` subprocesses, SSE event fan-out.
+- `internal/jobmanager` — the core: job state machine, a single-worker FIFO queue, the `Engine` abstraction (`mlx_whisper` vs whisper.cpp) that runs the transcription subprocess, SSE event fan-out.
 - `internal/server` — HTTP handlers (`net/http` `ServeMux`, Go 1.22+ method+pattern routing), embeds the built frontend via `go:embed`.
-- `internal/config` — tiny JSON config file (`~/Library/Application Support/whisper-gui/config.json`) for user-overridden binary paths.
-- `internal/whisperbin` — resolves the `mlx_whisper`/`ffmpeg` binary paths (config override → `PATH` → known pip fallback).
+- `internal/config` — tiny JSON config file (`~/Library/Application Support/whisper-gui/config.json`) for user-overridden binary paths and engine preference.
+- `internal/whisperbin` — resolves the `mlx_whisper`/`ffmpeg`/`whisper-cli` binary paths (config override → `PATH` → known pip fallback for mlx_whisper only).
 - `web/` — the frontend: vanilla TypeScript + `el()`/`clear()` DOM helpers, no framework, built by Vite straight into `internal/server/dist` so `go:embed` needs no copy step.
 - `srt/` — local scratch folder for subtitle files pulled off this machine's whisper-gui job history; gitignored, not part of the app itself.
 - `notes/` — personal reference notes (Go-learning notes, investigation write-ups); not part of the app, not imported by any code.
@@ -31,12 +31,12 @@ make run        # build + run the binary
 make test       # go test ./...
 ```
 
-External dependencies the app shells out to (not vendored): `mlx_whisper` (pip, Apple Silicon MLX build) and `ffmpeg` (Homebrew). Both are resolved at runtime by `internal/whisperbin`; Settings in the UI lets the user override the paths if auto-detection fails.
+External dependencies the app shells out to (not vendored): `mlx_whisper` (pip, Apple Silicon MLX build), whisper.cpp's `whisper-cli` (`brew install whisper-cpp`, no Python needed), and `ffmpeg` (Homebrew). All three are resolved at runtime by `internal/whisperbin`; the Settings panel in the UI lets the user override the paths if auto-detection fails, set the whisper.cpp model directory, and pick a default engine.
 
 ## Conventions
 
 - Go: standard library only for the server (no web framework, no router library).
-- Concurrency: transcription jobs run **one at a time** — MLX's unified-memory GPU path gains nothing from parallel jobs on a single Mac and it would only add OOM risk. Don't add a worker pool without revisiting that assumption.
+- Concurrency: transcription jobs run **one at a time**, regardless of engine — MLX's unified-memory GPU path gains nothing from parallel jobs on a single Mac and it would only add OOM risk. Don't add a worker pool without revisiting that assumption.
 - Frontend: no framework, no JSX/build-time templating — DOM built directly via the `el()` helper in `web/src/dom.ts`.
 - Package manager: [Bun](https://bun.sh), not npm — `web/` has no `package-lock.json`; use `bun install`/`bun run <script>` (or the `make` targets, which already do this).
 - Git commits: see the user-level instructions — commit messages are in Japanese.

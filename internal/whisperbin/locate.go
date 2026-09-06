@@ -24,9 +24,10 @@ type Resolution struct {
 }
 
 var (
-	mu           sync.Mutex
-	cachedMlx    *Resolution
-	cachedFFmpeg *Resolution
+	mu               sync.Mutex
+	cachedMlx        *Resolution
+	cachedFFmpeg     *Resolution
+	cachedWhisperCli *Resolution
 )
 
 // IsExecutable reports whether p exists, is a regular file, and has at
@@ -98,6 +99,31 @@ func resolveFFmpeg() Resolution {
 	return Resolution{ResolvedVia: ViaNone}
 }
 
+// LocateWhisperCli resolves whisper.cpp's whisper-cli binary: config override -> PATH
+// only, same as LocateFFmpeg -- `brew install whisper-cpp` puts it on a standard
+// Homebrew PATH, so no pip-style fallback path is needed the way mlx_whisper has one.
+func LocateWhisperCli() Resolution {
+	mu.Lock()
+	defer mu.Unlock()
+	if cachedWhisperCli != nil {
+		return *cachedWhisperCli
+	}
+	r := resolveWhisperCli()
+	cachedWhisperCli = &r
+	return r
+}
+
+func resolveWhisperCli() Resolution {
+	cfg, _ := config.Load()
+	if IsExecutable(cfg.WhisperCliPath) {
+		return Resolution{Path: cfg.WhisperCliPath, ResolvedVia: ViaConfig}
+	}
+	if p, err := exec.LookPath("whisper-cli"); err == nil {
+		return Resolution{Path: p, ResolvedVia: ViaPath}
+	}
+	return Resolution{ResolvedVia: ViaNone}
+}
+
 // Refresh clears the cached resolutions so the next Locate* call re-checks the
 // filesystem/PATH -- used after the user saves a new path in Settings.
 func Refresh() {
@@ -105,4 +131,5 @@ func Refresh() {
 	defer mu.Unlock()
 	cachedMlx = nil
 	cachedFFmpeg = nil
+	cachedWhisperCli = nil
 }
